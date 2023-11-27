@@ -1,0 +1,17 @@
+version: '3.6'
+services:
+  api:
+    container_name: nestJs-api
+    build:
+      context: .
+      dockerfile: ./apps/api/Dockerfile
+    volumes:
+      - ./apps/api/src:/app/apps/api/src
+    networks:
+      - test
+    ports:
+      - 3000:3000
+
+networks:
+  test:
+    name: test

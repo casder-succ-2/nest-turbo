@@ -1,0 +1,38 @@
+FROM node:alpine as builder
+WORKDIR /app
+RUN apk update && apk add --no-cache libc6-compat
+RUN npm install --global --no-update-notifier --no-fund turbo
+COPY . .
+RUN turbo prune --scope=api --docker
+
+# INSTALLER - Stage 2
+FROM node:alpine as installer
+WORKDIR /app
+RUN apk update && apk add --no-cache libc6-compat
+RUN npm install --global --no-update-notifier --no-fund pnpm
+COPY --from=builder /app/out/pnpm-lock.yaml ./pnpm-lock.yaml
+RUN pnpm fetch
+
+COPY --from=builder /app/out/pnpm-workspace.yaml ./pnpm-workspace.yaml
+COPY --from=builder /app/out/full/ .
+RUN pnpm install -r --prefer-offline --ignore-scripts
+COPY --from=builder /app/out/full/turbo.json ./turbo.json
+
+# APP_BUILDER - Stage 4
+FROM installer AS app_builder
+RUN pnpm turbo run build --filter=api...
+
+# RUNNER - Stage 5
+FROM node:alpine AS runner
+WORKDIR /app
+
+# Don't run production as root
+RUN addgroup --system --gid 1001 app
+RUN adduser --system --uid 1001 app
+USER app
+
+COPY --from=app_builder /app .
+
+EXPOSE 3000
+
+CMD ["node", "apps/api/dist/main.js"]
