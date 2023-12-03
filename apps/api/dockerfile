@@ -2,6 +2,7 @@ FROM node:alpine as builder
 WORKDIR /app
 RUN apk update && apk add --no-cache libc6-compat
 RUN npm install --global --no-update-notifier --no-fund turbo
+RUN npx prisma generate
 COPY . .
 RUN turbo prune --scope=api --docker
 
@@ -17,6 +18,10 @@ COPY --from=builder /app/out/pnpm-workspace.yaml ./pnpm-workspace.yaml
 COPY --from=builder /app/out/full/ .
 RUN pnpm install -r --prefer-offline --ignore-scripts
 COPY --from=builder /app/out/full/turbo.json ./turbo.json
+
+# DEVELOPMENT - Stage 3
+FROM installer AS development
+CMD pnpm turbo run dev --scope=api
 
 # APP_BUILDER - Stage 4
 FROM installer AS app_builder
